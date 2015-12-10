@@ -1,3 +1,11 @@
+# wechat-autobot-leancloud
+一个使用LeanCloud作为微信公众号自动回复机器人的应用。
+
+## 接入微信公众号
+1. 在LeanCloud上创建应用并发布。
+2. 在微信公众号后台输入URL。
+3. 在微信公众号输入Token为LeanCloud应用的Master Key。
+
 # node-js-getting-started
 
 一个简单的使用 Express 4 的 Node.js 应用。
