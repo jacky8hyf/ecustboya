@@ -4,7 +4,8 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-var todos = require('./routes/todos');
+// var todos = require('./routes/todos');
+var wechatapi = require('./routes/wechatapi');
 var cloud = require('./cloud');
 
 var app = express();
@@ -35,19 +36,15 @@ app.use(function(req, res, next) {
     console.error('uncaughtException url=%s, msg=%s', req.url, err.stack || err.message || err);
     if(!res.finished) {
       res.statusCode = 500;
-      res.setHeader('content-type', 'application/json; charset=UTF-8');
+      // res.setHeader('content-type', 'application/json; charset=UTF-8');
       res.end('uncaughtException');
     }
   });
   d.run(next);
 });
 
-app.get('/', function(req, res) {
-  res.render('index', { currentTime: new Date() });
-});
-
 // 可以将一类的路由单独保存在一个文件中
-app.use('/todos', todos);
+app.use('/wechat-api', wechatapi);
 
 // 如果任何路由都没匹配到，则认为 404
 // 生成一个异常让后面的 err handler 捕获
