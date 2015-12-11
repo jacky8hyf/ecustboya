@@ -26,6 +26,11 @@ app.use(xmlparser({
 }));
 app.use(cookieParser());
 
+// 访问记录
+app.use(function(req, res, next) {
+  console.log(req.method + ' ' + req.url)
+});
+
 // 未处理异常捕获 middleware
 app.use(function(req, res, next) {
   var d = null;
@@ -60,7 +65,7 @@ app.use(function(req, res, next) {
 // error handlers
 
 // 如果是开发环境，则将异常堆栈输出到页面，方便开发调试
-if (true || app.get('env') === 'development') {
+if (app.get('env') === 'development') {
   app.use(function(err, req, res, next) { // jshint ignore:line
     var statusCode = err.status || 500;
     if(statusCode === 500) {
