@@ -28,7 +28,8 @@ app.use(cookieParser());
 
 // 访问记录
 app.use(function(req, res, next) {
-  console.log(req.method + ' ' + req.url)
+  console.log(req.method + ' ' + req.url);
+  next();
 });
 
 // 未处理异常捕获 middleware
