@@ -4,6 +4,7 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
+var xmlparser = require('express-xml-bodyparser');
 // var todos = require('./routes/todos');
 var wechatapi = require('./routes/wechatapi');
 var cloud = require('./cloud');
@@ -20,6 +21,9 @@ app.use(cloud);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(xmlparser({
+  explicitArray:false,
+}));
 app.use(cookieParser());
 
 // 未处理异常捕获 middleware
@@ -36,7 +40,6 @@ app.use(function(req, res, next) {
     console.error('uncaughtException url=%s, msg=%s', req.url, err.stack || err.message || err);
     if(!res.finished) {
       res.statusCode = 500;
-      // res.setHeader('content-type', 'application/json; charset=UTF-8');
       res.end('uncaughtException');
     }
   });
@@ -64,6 +67,7 @@ if (app.get('env') === 'development') {
       console.error(err.stack || err);
     }
     res.status(statusCode);
+    res.type('xml');
     res.render('error', {
       message: err.message || err,
       error: err
@@ -74,6 +78,7 @@ if (app.get('env') === 'development') {
 // 如果是非开发环境，则页面只输出简单的错误信息
 app.use(function(err, req, res, next) { // jshint ignore:line
   res.status(err.status || 500);
+  res.type('xml');
   res.render('error', {
     message: err.message || err,
     error: {}
