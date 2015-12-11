@@ -28,7 +28,7 @@ app.use(cookieParser());
 
 // 访问记录
 app.use(function(req, res, next) {
-  console.log(req.method + ' ' + req.url);
+  console.log('%s %s', req.method, req.url);
   next();
 });
 
