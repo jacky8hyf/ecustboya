@@ -3,6 +3,8 @@ var AV = require('leanengine');
 var sha1 = require('js-sha1');
 var Promise = require('promise');
 
+// 类型定义
+
 var Activity = AV.Object.extend('Activity');
 var Participant = AV.Object.extend('Participant');
 var Message = AV.Object.extend('Message', {
@@ -13,11 +15,29 @@ var Message = AV.Object.extend('Message', {
   response: function() {
     return this.get('response');
   },
+  setError: function(errorObj) {
+    this.set('error', errorObj.toJSON());
+    return this;
+  },
+  error: function() {
+    return this.get('error');
+  },
 });
 
-var Error = function(message) {
-  this.message = message;
-}
+// Helper functions / methods
+
+Object.defineProperty(Error.prototype, 'toJSON', {
+  value: function () {
+    var alt = {};
+
+    Object.getOwnPropertyNames(this).forEach(function (key) {
+        alt[key] = this[key];
+    }, this);
+
+    return alt;
+  },
+  configurable: true
+});
 
 AV.Promise.prototype.toPromise = function() {
   var self = this;
@@ -31,12 +51,23 @@ AV.Promise.prototype.toPromise = function() {
   return p;
 }
 
+var ErrorWithStatus = function(message, status) {
+  var e = new Error(message);
+  e.status = status;
+  return e;
+}
+
+// 消息处理逻辑
+
 var handleEventMessage = function(message) {
-  return null;
+  return Promise.resolve(null);
 }
 
 var handleTextMessage = function(message) {
-  (null)();
+  return new Promise(function(resolve, reject) {
+    (null)();
+    resolve();
+  });
 }
 
 /**
@@ -46,7 +77,7 @@ var handleTextMessage = function(message) {
  * 3. Rejects if any error
  */
 var handleMessage = function(message) {
-  (function() {
+  return (function() {
     if(message.msgtype === 'text') 
       return handleTextMessage(message);
     if(message.msgtype === 'event')
@@ -57,30 +88,39 @@ var handleMessage = function(message) {
   }, function(error) {
     return Message.new(message).setError(error).save().toPromise();
   }).then(function(messageObj) {
-    return Message.response();
+    return messageObj.response();
   });
 }
 
+// 路由
+
 router.route('/')
 .all(function(req, res, next) {
-  signature = req.query.signature;
-  timestamp = req.query.timestamp;
-  nonce = req.query.nonce;
-  echostr = req.query.echostr;
-  token = process.env.LC_APP_MASTER_KEY;
-  result = [token, timestamp, nonce].sort().join("")
-  if(sha1(result) === signature)
-    next();
-  else
-    next(new Error('cannot authenticate.'));
+  var token = process.env.LC_APP_MASTER_KEY;
+  if(!req.query.timestamp || !req.query.nonce) {
+    next(ErrorWithStatus('cannot authenticate request (params).', 400));
+    return;
+  }
+  if(process.env.NODE_ENV === 'production' && Math.abs(Date.now() / 1000 - parseInt(req.query.timestamp)) > 60000) {
+    next(ErrorWithStatus('cannot authenticate request (expires).', 401));
+    return;
+  }
+  if(sha1([token, req.query.timestamp, req.query.nonce].sort().join("")) !== req.query.signature) {
+    next(ErrorWithStatus('cannot authenticate request (sha1).', 401));
+    return;
+  }
+  
+  next();
 })
 // 微信，验证服务器地址的有效性。 http://mp.weixin.qq.com/wiki/17/2d4265491f12608cd170a95559800f2d.html
 .get(function(req, res, next) {
-  res.type('text').send(echostr);
+  res.type('text').send(req.query.echostr);
 })
 // 微信，接受与被动回复消息。 http://mp.weixin.qq.com/wiki/14/89b871b5466b19b3efa4ada8e577d45e.html
 .post(function(req, res, next) {
-  message = req.body.xml;
+  var message = req.body.xml;
+  if(message.createtime)
+    message.createtime = parseInt(message.createtime)
   handleMessage(message).then(function(responseMessage) {
     if(responseMessage) {
       res.type('xml').render('textmsg', {
