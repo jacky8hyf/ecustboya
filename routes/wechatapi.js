@@ -10,7 +10,7 @@ var Error = function(message) {
 }
 
 var handleMessage = function(message) {
-  console.log(message)
+  // console.log(message)
   return message.msgtype === 'text' ? (message.content || '') : "很抱歉，暂时无法处理多媒体消息。"
 }
 
