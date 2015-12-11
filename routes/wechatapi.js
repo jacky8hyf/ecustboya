@@ -10,7 +10,7 @@ var Error = function(message) {
 }
 
 var handleMessage = function(message) {
-  return message.msgtype === 'text' ? (message.content || '') : "很抱歉，暂时无法处理多媒体消息。"
+  return message.msgtype === 'text' ? (message.content || '') : ("很抱歉，暂时无法处理多媒体消息。" + JSON.stringify(message))
 }
 
 router.route('/')
