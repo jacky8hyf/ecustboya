@@ -22,8 +22,9 @@ router.route('/')
   nonce = req.query.nonce;
   echostr = req.query.echostr;
   token = process.env.LC_APP_MASTER_KEY;
-  console.log('Computing SHA-1 for ', [token, timestamp, nonce].sort().join(""))
-  if(sha1() === signature)
+  result = [token, timestamp, nonce].sort().join("")
+  console.log('Computing SHA-1 for ', result)
+  if(sha1(result) === signature)
     res.type('text').send(echostr);
   else
     next(new Error('cannot authenticate.'))
