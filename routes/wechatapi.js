@@ -23,7 +23,6 @@ router.route('/')
   echostr = req.query.echostr;
   token = process.env.LC_APP_MASTER_KEY;
   result = [token, timestamp, nonce].sort().join("")
-  console.log('Computing SHA-1 for ', result)
   if(sha1(result) === signature)
     res.type('text').send(echostr);
   else
