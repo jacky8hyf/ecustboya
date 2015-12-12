@@ -263,6 +263,7 @@ var handleTextMessage = function(message) {
  * 3. Rejects if any error
  */
 var handleMessage = function(message) {
+  console.log('Received ', message)
   return (function() {
     if(message.MsgType === 'text') 
       return handleTextMessage(message);
@@ -274,6 +275,7 @@ var handleMessage = function(message) {
   }).then(function(response) {
     return Message.new(message).setResponse(response).save().toPromise();
   }, function(error) {
+    console.log(error.stack || error);
     return Message.new(message).setError(error).save().toPromise();
   }).then(function(messageObj) {
     if(messageObj.error)
@@ -324,7 +326,7 @@ router.route('/')
     // no need to pass to next()
   }, function(error) {
     // should not reach here
-    console.log('Should not reach here!', error || error.stack);
+    console.log('Should not reach here!', error.stack || error);
     next(error);
   });
 })
