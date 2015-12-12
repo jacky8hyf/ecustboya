@@ -253,8 +253,7 @@ var respondSignUp = function(message) {
 }
 
 var handleEventMessage = function(message) {
-  return Template.createResponse('event.' + message.Event, 
-    message.ToUserName, message.FromUserName);
+  return Template.createResponse('event.' + message.Event, message);
 }
 var handleMediaMessage = function(message) {
   return Promise.resolve(null); // sends "_nomatch"
