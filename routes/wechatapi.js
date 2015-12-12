@@ -9,6 +9,7 @@ var xmlBuilder = new (require('xml2js').Builder)({
 });
 var sprintf = require("sprintf-js").sprintf,
     vsprintf = require("sprintf-js").vsprintf;
+var isArray = require('utils').isArray;
 
 var SIGN_UP_ACTIVITY_SUFFIX = '报名';
 
@@ -43,8 +44,6 @@ var Activity = AV.Object.extend('Activity', {
     return new AV.Query(this)
       .equalTo('keywords', keyword)
       .descending('endDate')
-      // .lessThanOrEqualTo('startDate', new Date())  // 报名已开放
-      // .greaterThanOrEqualTo('endDate', new Date()) // 报名未截止
       .limit(2)
       .find().toPromise()
       .then(function(activities) {
@@ -212,7 +211,7 @@ var respondSignUp = function(message) {
       activity = foundActivity;
       mo = message.Content.match(/^\s*(.*?)\s+(.*?)\s+(\d*?)\s+([\+\d]{11,14})\s*$/);
       if(!mo) 
-        return Promise.reject("_inputError", [activity.name()]);
+        return Promise.reject(["_inputError",activity.name()]);
       return activity.allowJoin(message.FromUserName);
     }).then(function(results) {
       count = results[1];
@@ -228,10 +227,15 @@ var respondSignUp = function(message) {
       }).save();
     }).then(function(participant) {
       return Promise.reject("_activityJoined")
-    }).then(function(){}, function(key, args) {
-      // console.log('***', key, args)
-      // FIXME args is null.
-      return key ? Template.createResponse(key, message, args) : Promise.resolve(null);
+    }).then(function(){}, function(args) {
+      var key, formatArgs;
+      if(isArray(args)) {
+        key = args[0];
+        formatArgs = args.slice(1);
+      } else {
+        key = args;
+      }
+      return key ? Template.createResponse(key, message, formatArgs) : Promise.resolve(null);
     });
 }
 
@@ -244,14 +248,17 @@ var handleMediaMessage = function(message) {
 }
 
 var handleTextMessage = function(message) {
+  console.log('Received text', message)
   if(message.Content.endsWith(SIGN_UP_ACTIVITY_SUFFIX))
     return Activity.createResponse(message.Content.slice(0, -SIGN_UP_ACTIVITY_SUFFIX.length), message);
-  return Promise.all([
-    Template.createResponse(message.Content, message),
-    respondSignUp(message),
-  ]).then(function(results) {
-    return results[0] || results[1]; // if both null, sends "_nomatch"
-  })
+  return Template.createResponse(message.Content, message)
+    .then(function(response) {
+      console.log('Template.createResponse:', response);
+      return response || respondSignUp(message);
+    }).then(function(response) {
+      console.log('respondSignUp:', response);
+      return response;
+    });
 }
 
 /**
@@ -263,7 +270,6 @@ var handleTextMessage = function(message) {
  * 3. Rejects if any error
  */
 var handleMessage = function(message) {
-  console.log('Received ', message)
   return (function() {
     if(message.MsgType === 'text') 
       return handleTextMessage(message);
