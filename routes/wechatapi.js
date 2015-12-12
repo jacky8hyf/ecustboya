@@ -59,7 +59,6 @@ var Activity = AV.Object.extend('Activity', {
       return activity.allowJoin(oldMessage.FromUserName).then(function(){
         return Template.createResponse("_activityEnterInfoPrompt", oldMessage, [activity.name()]) 
       }, function(key) {
-        console.error(key.stack || key);
         return Template.createResponse(key, oldMessage);
       });
     })
@@ -81,21 +80,37 @@ var Participant = AV.Object.extend('Participant', {
 var Template = AV.Object.extend('Template', {
   msgType: function(){return this.get('msgType');},
   content: function(args) {
-    try {
-      var c = vsprintf(this.get('content'), args);
-      console.log(args, c);
-      return c;
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
+    return vsprintf(this.get('content'), args);
   },
+  // http://mp.weixin.qq.com/wiki/4/b3546879f07623cb30df9ca0e420a5d0.html
+  /**
+   * Resolves to a list of:
+    {
+      "title":TITLE,
+      "thumb_media_id":THUMB_MEDIA_ID,
+      "show_cover_pic":SHOW_COVER_PIC(0/1),
+      "author":AUTHOR,
+      "digest":DIGEST,
+      "content":CONTENT,
+      "url":URL,
+      "content_source_url":CONTENT_SOURCE_URL
+    },
+   */
+  fetchArticles: function() {
+    // FIXME
+    return Promise.resolve([]);
+  };
   /**生成一个微信消息的对象（包括FromUserName, ToUserName, CreateTime等）。若创建失败返回null。*/
   toMessage: function(from, to, args) {
     if(this.msgType() === 'text')
-      return textMessage(from, to, this.content(args))
-    // TODO hanlde other message types for templates here
-    return null;
+      return Promise.resolve(textMessage(from, to, this.content(args)));
+    if(this.msgType() === 'news')
+      return Promise.resolve(null);
+      // return this.fetchArticles().then(function(articles) {
+
+      // })
+      // TODO hanlde other message types for templates here
+    return Promise.resolve(null);
   },
 }, {
   /**
@@ -105,15 +120,12 @@ var Template = AV.Object.extend('Template', {
    * @param args 若
    */
   createResponse: function(keyword, oldMessage, args) {
-    console.log('Looking for template matching ' + keyword);
-
     return new AV.Query(this)
       .equalTo('keywords', keyword) // as per https://leancloud.cn/docs/js_guide.html#对数组值做查询
       .descending('updatedAt')
       .limit(2)
       .find().toPromise()
       .then(function(templates) {
-        // console.log(templates);
         if (templates.length == 0) return Promise.resolve(null); // 如果没有模板，返回null。
         if (templates.length >= 2) console.warn('对于关键字' + keyword + '有多个消息模板；请检查。');
         return templates[0].toMessage(oldMessage.ToUserName, oldMessage.FromUserName, args);
@@ -199,6 +211,10 @@ var errorWithStatus = function(message, status) {
   return e;
 }
 
+/** 
+ * 创建微信文本消息对象。稍后可以通过xmljs.Builder.buildObject来创建XML。
+ * @param msg 消息文本字符串
+ */
 var textMessage = function(from, to, msg) {
   return {
     ToUserName: to,
@@ -206,6 +222,21 @@ var textMessage = function(from, to, msg) {
     CreateTime: parseInt(Date.now() / 1000),
     Content: msg,
     MsgType: 'text'
+  }
+}
+
+/** 
+ * 创建微信图文消息对象。稍后可以通过xmljs.Builder.buildObject来创建XML。
+ * @param articles array of {"Title":"...","Description":"...",...}
+ */
+var newsMessage = function(from, to, articles) {
+  return {
+    ToUserName: to,
+    FromUserName: from,
+    CreateTime: parseInt(Date.now() / 1000),
+    MsgType: 'news',
+    ArticleCount: articles.length,
+    Articles: articles.map(function(e){return{"item":e};}),
   }
 }
 
@@ -264,13 +295,10 @@ var handleTextMessage = function(message) {
     return Activity.createResponse(message.Content.slice(0, -SIGN_UP_ACTIVITY_SUFFIX.length), message);
   return Template.createResponse(message.Content, message)
     .then(function(response) {
-      // console.log('Template.createResponse:', response);
       return response || respondSignUp(message);
     }).then(function(response) {
-      // console.log('respondSignUp:', response);
       return response;
     }, function(reason) {
-      // console.log('handleTextMessage error', reason.stack || reason);
       return Promise.reject(reason);
     });
 }
@@ -295,7 +323,6 @@ var handleMessage = function(message) {
   }).then(function(response) {
     return Message.new(message).setResponse(response).save().toPromise();
   }, function(error) {
-    // console.log(error.stack || error);
     return Message.new(message).setError(error).save().toPromise();
   }).then(function(messageObj) {
     if(messageObj.error)
@@ -318,7 +345,6 @@ router.route('/')
     return;
   }
   var shaResult = sha1([token, req.query.timestamp, req.query.nonce].sort().join(""));
-  // console.log(shaResult);
   if(shaResult !== req.query.signature) {
     next(errorWithStatus('cannot authenticate request (sha1).', 401));
     return;
@@ -337,16 +363,13 @@ router.route('/')
   handleMessage(message).then(function(responseMessage) {
     if(responseMessage) {
       var xml = xmlBuilder.buildObject(responseMessage)
-      // console.log('Replying ', xml);
       res.type('xml').send(xml);
     } else {
-      // console.log('Should not reach here!');
       res.send(); // ignore this message
     }
     // no need to pass to next()
   }, function(error) {
     // should not reach here
-    // console.log('Should not reach here!', error.stack || error);
     next(error);
   });
 })
