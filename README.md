@@ -5,6 +5,7 @@
 1. 在LeanCloud上创建应用并发布。
 2. 在微信公众号后台输入URL。
 3. 在微信公众号输入Token为LeanCloud应用的Master Key。
+4. 修改routes/wechatapi.js中的handleTextMessage，handleEventMessage和handleMediaMessage来处理对应的方法。
 
 # node-js-getting-started
 
