@@ -258,6 +258,9 @@ var handleTextMessage = function(message) {
     }).then(function(response) {
       console.log('respondSignUp:', response);
       return response;
+    }, function(reason) {
+      console.log('handleTextMessage error', reason.stack || reason);
+      return Promise.reject(reason);
     });
 }
 
