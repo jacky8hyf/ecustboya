@@ -9,7 +9,7 @@ var xmlBuilder = new (require('xml2js').Builder)({
 });
 var sprintf = require("sprintf-js").sprintf,
     vsprintf = require("sprintf-js").vsprintf;
-var isArray = require('utils').isArray;
+var isArray = require('../lib/utils').isArray;
 
 var SIGN_UP_ACTIVITY_SUFFIX = '报名';
 
