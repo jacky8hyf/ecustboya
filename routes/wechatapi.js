@@ -301,7 +301,6 @@ router.route('/')
     next(errorWithStatus('cannot authenticate request (sha1).', 401));
     return;
   }
-  console.log('Authenticated server, passing on...');
   next();
 })
 // 微信，验证服务器地址的有效性。 http://mp.weixin.qq.com/wiki/17/2d4265491f12608cd170a95559800f2d.html
@@ -316,8 +315,10 @@ router.route('/')
   handleMessage(message).then(function(responseMessage) {
     if(responseMessage) {
       var xml = xmlBuilder.buildObject(responseMessage)
+      console.log('Replying ', xml);
       res.type('xml').send(xml);
     } else {
+      console.log('Should not reach here!');
       res.send(); // ignore this message
     }
     // no need to pass to next()
