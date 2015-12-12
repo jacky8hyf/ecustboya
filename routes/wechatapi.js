@@ -19,6 +19,25 @@ var Activity = AV.Object.extend('Activity', {
   capacity: function(){return this.get('capacity');},
   startDate: function(){return this.get('startDate');}, 
   endDate: function(){return this.get('endDate');}, 
+  allowJoin: function(wechatOpenId) {
+    var today = new Date();
+    var activity = this;
+    if(today < activity.startDate())
+      return Promise.reject("_activityNotOpen");
+    if(today > activity.endDate())
+      return Promise.reject("_activityClosed");
+    return Promise.all([
+      Participant.countForActivity(activity), 
+      Participant.find(wechatOpenId, activity)
+    ]).then(function(results) {
+      var count = results[0], foundParticipant = results[1];
+      if(foundParticipant)
+        return Promise.reject("_activityDuplicatedJoin");
+      if(count >= activity.capacity())
+        return Promise.reject("_activityFull");
+      return Promise.resolve(count);
+    });
+  },
 }, {
   find: function(keyword) {
     return new AV.Query(this)
@@ -33,17 +52,21 @@ var Activity = AV.Object.extend('Activity', {
         return activities[0];
       });
   },
+
   createResponse: function(keyword, oldMessage) {
-    return this.find(keyword)
-      .then(function(activity) {
-        return activity 
-          ? Template.createResponse("_activityEnterInfoPrompt", oldMessage, [activity.name()]) 
-          : null;
+    return this.find(keyword).then(function(activity) {
+      if(!activity)
+        return Promise.resolve(null);
+      return activity.allowJoin(oldMessage.FromUserName).then(function(){
+        return Template.createResponse("_activityEnterInfoPrompt", oldMessage, [activity.name()]) 
+      }, function(key) {
+        console.error(key.stack || key);
+        return Template.createResponse(key, oldMessage);
+      });
     })
   },
 });
 var Participant = AV.Object.extend('Participant', {
-
 }, {
   find: function(wechatOpenId, activity) {
     return new AV.Query(this)
@@ -61,7 +84,7 @@ var Template = AV.Object.extend('Template', {
   content: function(args) {
     try {
       var c = vsprintf(this.get('content'), args);
-      // console.log(c);
+      console.log(args, c);
       return c;
     } catch (e) {
       console.error(e);
@@ -83,6 +106,8 @@ var Template = AV.Object.extend('Template', {
    * @param args 若
    */
   createResponse: function(keyword, oldMessage, args) {
+    console.log('Looking for template matching ' + keyword);
+
     return new AV.Query(this)
       .equalTo('keywords', keyword) // as per https://leancloud.cn/docs/js_guide.html#对数组值做查询
       .descending('updatedAt')
@@ -175,8 +200,7 @@ var textMessage = function(from, to, msg) {
 // 消息处理逻辑
 
 var respondSignUp = function(message) {
-  var mo = message.Content.match(/^\s*(.*?)\s+(.*?)\s+(\d*?)\s+([\+\d]{11,14})\s*$/)
-  if(!mo) return Promise.resolve(null);
+  var mo;
   var activity;
   var count;
   return Message.findLastMessageFrom(message.FromUserName)
@@ -186,19 +210,12 @@ var respondSignUp = function(message) {
     }).then(function(foundActivity) {
       if(!foundActivity) return Promise.reject();
       activity = foundActivity;
-      var today = new Date();
-      if(today < activity.startDate())
-        return Promise.reject("_activityNotOpen")
-      if(today > activity.endDate())
-        return Promise.reject("_activityClosed")
-      return Promise.all([
-        Participant.find(message.FromUserName, activity), 
-        Participant.countForActivity(activity)]);
+      mo = message.Content.match(/^\s*(.*?)\s+(.*?)\s+(\d*?)\s+([\+\d]{11,14})\s*$/);
+      if(!mo) 
+        return Promise.reject("_inputError", [activity.name()]);
+      return activity.allowJoin(message.FromUserName);
     }).then(function(results) {
-      var foundParticipant = results[0];
       count = results[1];
-      if(foundParticipant)
-        return Promise.reject("_activityDuplicatedJoin");
       if(count >= activity.capacity)
         return Promise.reject("_activityFull");
       return Participant.new({
@@ -211,8 +228,10 @@ var respondSignUp = function(message) {
       }).save();
     }).then(function(participant) {
       return Promise.reject("_activityJoined")
-    }).then(function(){}, function(key) {
-      return key ? Template.createResponse(key, message) : Promise.resolve(null);
+    }).then(function(){}, function(key, args) {
+      // console.log('***', key, args)
+      // FIXME args is null.
+      return key ? Template.createResponse(key, message, args) : Promise.resolve(null);
     });
 }
 
