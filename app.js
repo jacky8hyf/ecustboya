@@ -5,7 +5,6 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var xmlparser = require('express-xml-bodyparser');
-// var todos = require('./routes/todos');
 var wechatapi = require('./routes/wechatapi');
 var cloud = require('./cloud');
 
@@ -22,6 +21,9 @@ app.use(cloud);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(xmlparser({
+  normalizeTags:false,
+  normalize:false,
+  trim:false,
   explicitArray:false,
 }));
 app.use(cookieParser());

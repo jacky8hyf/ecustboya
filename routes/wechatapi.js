@@ -2,6 +2,11 @@ var router = require('express').Router();
 var AV = require('leanengine');
 var sha1 = require('js-sha1');
 var Promise = require('promise');
+var xmlBuilder = new (require('xml2js').Builder)({
+  headless: true,
+  rootName: 'xml',
+  cdata: true,
+});
 
 // 类型定义
 
@@ -51,10 +56,20 @@ AV.Promise.prototype.toPromise = function() {
   return p;
 }
 
-var ErrorWithStatus = function(message, status) {
+var errorWithStatus = function(message, status) {
   var e = new Error(message);
   e.status = status;
   return e;
+}
+
+var textMessage = function(from, to, msg) {
+  return {
+    ToUserName: to,
+    FromUserName: from,
+    CreateTime: parseInt(Date.now() / 1000),
+    Content: msg,
+    MsgType: 'text'
+  }
 }
 
 // 消息处理逻辑
@@ -62,33 +77,35 @@ var ErrorWithStatus = function(message, status) {
 var handleEventMessage = function(message) {
   return Promise.resolve(null);
 }
+var handleMediaMessage = function(message) {
+  return Promise.resolve(null);
+}
 
 var handleTextMessage = function(message) {
   return new Promise(function(resolve, reject) {
-    (null)();
-    resolve();
+    resolve(textMessage(message.ToUserName, message.FromUserName, message.Content));
   });
 }
 
 /**
  * Return a promise that will 
  * 1. Resolve to null if no response shall be sent to the user
- * 2. Resolve to a string that contains the response otherwise
+ * 2. Resolve to an object that contains the response otherwise
  * 3. Rejects if any error
  */
 var handleMessage = function(message) {
   return (function() {
-    if(message.msgtype === 'text') 
+    if(message.MsgType === 'text') 
       return handleTextMessage(message);
-    if(message.msgtype === 'event')
+    if(message.MsgType === 'event')
       return handleEventMessage(message);
-    return Promise.resolve("很抱歉，暂时无法处理多媒体消息。");
+    return handleMediaMessage(message);
   })().then(function(responseStr) {
     return Message.new(message).setResponse(responseStr).save().toPromise();
   }, function(error) {
     return Message.new(message).setError(error).save().toPromise();
   }).then(function(messageObj) {
-    return messageObj.response();
+    return Promise.resolve(messageObj.response());
   });
 }
 
@@ -98,15 +115,17 @@ router.route('/')
 .all(function(req, res, next) {
   var token = process.env.LC_APP_MASTER_KEY;
   if(!req.query.timestamp || !req.query.nonce) {
-    next(ErrorWithStatus('cannot authenticate request (params).', 400));
+    next(errorWithStatus('cannot authenticate request (params).', 400));
     return;
   }
   if(process.env.NODE_ENV === 'production' && Math.abs(Date.now() / 1000 - parseInt(req.query.timestamp)) > 60000) {
-    next(ErrorWithStatus('cannot authenticate request (expires).', 401));
+    next(errorWithStatus('cannot authenticate request (expires).', 401));
     return;
   }
-  if(sha1([token, req.query.timestamp, req.query.nonce].sort().join("")) !== req.query.signature) {
-    next(ErrorWithStatus('cannot authenticate request (sha1).', 401));
+  var shaResult = sha1([token, req.query.timestamp, req.query.nonce].sort().join(""));
+  // console.log(shaResult);
+  if(shaResult !== req.query.signature) {
+    next(errorWithStatus('cannot authenticate request (sha1).', 401));
     return;
   }
   
@@ -116,19 +135,15 @@ router.route('/')
 .get(function(req, res, next) {
   res.type('text').send(req.query.echostr);
 })
-// 微信，接受与被动回复消息。 http://mp.weixin.qq.com/wiki/14/89b871b5466b19b3efa4ada8e577d45e.html
+// 微信，接收与被动回复消息。 http://mp.weixin.qq.com/wiki/14/89b871b5466b19b3efa4ada8e577d45e.html
 .post(function(req, res, next) {
   var message = req.body.xml;
-  if(message.createtime)
-    message.createtime = parseInt(message.createtime)
+  if(message.CreateTime)
+    message.CreateTime = parseInt(message.CreateTime)
   handleMessage(message).then(function(responseMessage) {
     if(responseMessage) {
-      res.type('xml').render('textmsg', {
-        tousername: message.fromusername,
-        fromusername: message.tousername,
-        createtime: parseInt(Date.now() / 1000),
-        content: responseMessage,
-      });
+      var xml = xmlBuilder.buildObject(responseMessage)
+      res.type('xml').send(xml);
     } else {
       res.send(); // ignore this message
     }
