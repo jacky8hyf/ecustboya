@@ -10,27 +10,31 @@ var xmlBuilder = new (require('xml2js').Builder)({
 var sprintf = require("sprintf-js").sprintf,
     vsprintf = require("sprintf-js").vsprintf;
 
+var SIGN_UP_ACTIVITY_SUFFIX = '报名';
+
 // 类型定义
 
 var Activity = AV.Object.extend('Activity', {
   name: function(){return this.get('name');},
+  capacity: function(){return this.get('capacity');},
+  startDate: function(){return this.get('startDate');}, 
+  endDate: function(){return this.get('endDate');}, 
 }, {
   find: function(keyword) {
     return new AV.Query(this)
       .equalTo('keywords', keyword)
-      .descending('updatedAt')
-      .lessThanOrEqualTo('startDate', new Date())  // 报名已开放
-      .greaterThanOrEqualTo('endDate', new Date()) // 报名未截止
+      .descending('endDate')
+      // .lessThanOrEqualTo('startDate', new Date())  // 报名已开放
+      // .greaterThanOrEqualTo('endDate', new Date()) // 报名未截止
       .limit(2)
       .find().toPromise()
       .then(function(activities) {
         if (activities.length == 0) return Promise.resolve(null); // 如果没有活动，返回null。
-        if (activities.length >= 2) console.warn('对于关键字' + keyword + '有多个活动；请检查。');
         return activities[0];
       });
   },
   createResponse: function(keyword, oldMessage) {
-    return this.findActivity(keyword)
+    return this.find(keyword)
       .then(function(activity) {
         return activity 
           ? Template.createResponse("_activityEnterInfoPrompt", oldMessage, [activity.name()]) 
@@ -38,13 +42,26 @@ var Activity = AV.Object.extend('Activity', {
     })
   },
 });
-var Participant = AV.Object.extend('Participant');
+var Participant = AV.Object.extend('Participant', {
+
+}, {
+  find: function(wechatOpenId, activity) {
+    return new AV.Query(this)
+      .equalTo('wechatOpenId', wechatOpenId)
+      .equalTo('activity', activity)
+      .find().toPromise()
+      .then(function(participants) {return participants[0];});
+  },
+  countForActivity: function(activity) {
+    return new AV.Query(this).equalTo('activity', activity).count().toPromise();
+  },
+});
 var Template = AV.Object.extend('Template', {
   msgType: function(){return this.get('msgType');},
   content: function(args) {
     try {
       var c = vsprintf(this.get('content'), args);
-      console.log(c);
+      // console.log(c);
       return c;
     } catch (e) {
       console.error(e);
@@ -55,7 +72,7 @@ var Template = AV.Object.extend('Template', {
   toMessage: function(from, to, args) {
     if(this.msgType() === 'text')
       return textMessage(from, to, this.content(args))
-    // TODO hanlde other message types here
+    // TODO hanlde other message types for templates here
     return null;
   },
 }, {
@@ -72,7 +89,7 @@ var Template = AV.Object.extend('Template', {
       .limit(2)
       .find().toPromise()
       .then(function(templates) {
-        console.log(templates);
+        // console.log(templates);
         if (templates.length == 0) return Promise.resolve(null); // 如果没有模板，返回null。
         if (templates.length >= 2) console.warn('对于关键字' + keyword + '有多个消息模板；请检查。');
         return templates[0].toMessage(oldMessage.ToUserName, oldMessage.FromUserName, args);
@@ -80,7 +97,7 @@ var Template = AV.Object.extend('Template', {
   },
 })
 var Message = AV.Object.extend('Message', {
-  Content: function() {return this.get('Content');}
+  Content: function() {return this.get('Content');},
   setResponse: function(responseStr) {
     this.set('response', responseStr);
     return this;
@@ -90,15 +107,13 @@ var Message = AV.Object.extend('Message', {
   },
   setError: function(errorObj) {
     this.set('error', errorObj.toJSON());
+    this.error = errorObj;
     return this;
   },
-  error: function() {
-    return this.get('error');
-  },
   findActivity: function() {
-    if(this.Conent().endsWith('报名'))
-      return Activity.find(this.Conent().slice(0, -2))
-    return Promise.resolve(null);
+    return this.Content().endsWith(SIGN_UP_ACTIVITY_SUFFIX)
+      ? Activity.find(this.Content().slice(0, -SIGN_UP_ACTIVITY_SUFFIX.length))
+      : Promise.resolve(null);
   },
 }, {
   findLastMessageFrom: function(from) {
@@ -110,7 +125,8 @@ var Message = AV.Object.extend('Message', {
       .then(function(messages) {
         return messages[0]; // prevents reject if not found, as opposed to .first()
       });
-  }
+  },
+
 });
 
 // Helper functions / methods
@@ -158,6 +174,48 @@ var textMessage = function(from, to, msg) {
 
 // 消息处理逻辑
 
+var respondSignUp = function(message) {
+  var mo = message.Content.match(/^\s*(.*?)\s+(.*?)\s+(\d*?)\s+([\+\d]{11,14})\s*$/)
+  if(!mo) return Promise.resolve(null);
+  var activity;
+  var count;
+  return Message.findLastMessageFrom(message.FromUserName)
+    .then(function(message) {
+      if(!message) return Promise.reject();
+      return message.findActivity();
+    }).then(function(foundActivity) {
+      if(!foundActivity) return Promise.reject();
+      activity = foundActivity;
+      var today = new Date();
+      if(today < activity.startDate())
+        return Promise.reject("_activityNotOpen")
+      if(today > activity.endDate())
+        return Promise.reject("_activityClosed")
+      return Promise.all([
+        Participant.find(message.FromUserName, activity), 
+        Participant.countForActivity(activity)]);
+    }).then(function(results) {
+      var foundParticipant = results[0];
+      count = results[1];
+      if(foundParticipant)
+        return Promise.reject("_activityDuplicatedJoin");
+      if(count >= activity.capacity)
+        return Promise.reject("_activityFull");
+      return Participant.new({
+        activity: activity,
+        name: mo[1],
+        cls: mo[2],
+        studentId: mo[3],
+        phoneNumber: mo[4],
+        wechatOpenId: message.FromUserName,
+      }).save();
+    }).then(function(participant) {
+      return Promise.reject("_activityJoined")
+    }).then(function(){}, function(key) {
+      return key ? Template.createResponse(key, message) : Promise.resolve(null);
+    });
+}
+
 var handleEventMessage = function(message) {
   return Template.createResponse('event.' + message.Event, 
     message.ToUserName, message.FromUserName);
@@ -167,12 +225,11 @@ var handleMediaMessage = function(message) {
 }
 
 var handleTextMessage = function(message) {
-
-  if(message.Conent.endsWith('报名'))
-    return Activity.createResponse(message.Content.slice(0, -2), message);
-
+  if(message.Content.endsWith(SIGN_UP_ACTIVITY_SUFFIX))
+    return Activity.createResponse(message.Content.slice(0, -SIGN_UP_ACTIVITY_SUFFIX.length), message);
   return Promise.all([
-    Template.createResponse(message.Content, message)
+    Template.createResponse(message.Content, message),
+    respondSignUp(message),
   ]).then(function(results) {
     return results[0] || results[1]; // if both null, sends "_nomatch"
   })
@@ -198,11 +255,11 @@ var handleMessage = function(message) {
   }).then(function(response) {
     return Message.new(message).setResponse(response).save().toPromise();
   }, function(error) {
-    if ((process.env.NODE_ENV || 'development') === 'development')
-      console.error(error);
     return Message.new(message).setError(error).save().toPromise();
   }).then(function(messageObj) {
-    return messageObj.response(); // if any error, this will be null and "该公众号暂时不可用"
+    if(messageObj.error)
+      return Promise.reject(messageObj.error); // if any error, this will be not null and "公众号不可用".
+    return messageObj.response(); 
   });
 }
 
@@ -246,6 +303,7 @@ router.route('/')
     }
     // no need to pass to next()
   }, function(error) {
+    // should not reach here
     next(error);
   });
 })
