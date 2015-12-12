@@ -260,18 +260,17 @@ var handleMediaMessage = function(message) {
 }
 
 var handleTextMessage = function(message) {
-  console.log('Received text', message, typeof message.Content)
   if(message.Content.endsWith(SIGN_UP_ACTIVITY_SUFFIX))
     return Activity.createResponse(message.Content.slice(0, -SIGN_UP_ACTIVITY_SUFFIX.length), message);
   return Template.createResponse(message.Content, message)
     .then(function(response) {
-      console.log('Template.createResponse:', response);
+      // console.log('Template.createResponse:', response);
       return response || respondSignUp(message);
     }).then(function(response) {
-      console.log('respondSignUp:', response);
+      // console.log('respondSignUp:', response);
       return response;
     }, function(reason) {
-      console.log('handleTextMessage error', reason.stack || reason);
+      // console.log('handleTextMessage error', reason.stack || reason);
       return Promise.reject(reason);
     });
 }
@@ -296,7 +295,7 @@ var handleMessage = function(message) {
   }).then(function(response) {
     return Message.new(message).setResponse(response).save().toPromise();
   }, function(error) {
-    console.log(error.stack || error);
+    // console.log(error.stack || error);
     return Message.new(message).setError(error).save().toPromise();
   }).then(function(messageObj) {
     if(messageObj.error)
@@ -338,16 +337,16 @@ router.route('/')
   handleMessage(message).then(function(responseMessage) {
     if(responseMessage) {
       var xml = xmlBuilder.buildObject(responseMessage)
-      console.log('Replying ', xml);
+      // console.log('Replying ', xml);
       res.type('xml').send(xml);
     } else {
-      console.log('Should not reach here!');
+      // console.log('Should not reach here!');
       res.send(); // ignore this message
     }
     // no need to pass to next()
   }, function(error) {
     // should not reach here
-    console.log('Should not reach here!', error.stack || error);
+    // console.log('Should not reach here!', error.stack || error);
     next(error);
   });
 })
