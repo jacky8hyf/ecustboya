@@ -180,6 +180,19 @@ AV.Promise.prototype.toPromise = function() {
   return p;
 }
 
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/endsWith
+if (!String.prototype.endsWith) {
+  String.prototype.endsWith = function(searchString, position) {
+      var subjectString = this.toString();
+      if (typeof position !== 'number' || !isFinite(position) || Math.floor(position) !== position || position > subjectString.length) {
+        position = subjectString.length;
+      }
+      position -= searchString.length;
+      var lastIndex = subjectString.indexOf(searchString, position);
+      return lastIndex !== -1 && lastIndex === position;
+  };
+}
+
 var errorWithStatus = function(message, status) {
   var e = new Error(message);
   e.status = status;
@@ -248,7 +261,7 @@ var handleMediaMessage = function(message) {
 }
 
 var handleTextMessage = function(message) {
-  console.log('Received text', message)
+  console.log('Received text', message, typeof message.Content)
   if(message.Content.endsWith(SIGN_UP_ACTIVITY_SUFFIX))
     return Activity.createResponse(message.Content.slice(0, -SIGN_UP_ACTIVITY_SUFFIX.length), message);
   return Template.createResponse(message.Content, message)
