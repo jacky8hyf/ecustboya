@@ -30,7 +30,7 @@ app.use(cookieParser());
 
 // 访问记录
 app.use(function(req, res, next) {
-  console.log('%s %s', req.method, req.url);
+  console.log('%s %s', req.method, req.originalUrl);
   next();
 });
 
@@ -68,7 +68,7 @@ app.use(function(req, res, next) {
 // error handlers
 
 // 如果是开发环境，则将异常堆栈输出到页面，方便开发调试
-if (true && app.get('env') === 'development') {
+if (app.get('env') === 'development') {
   app.use(function(err, req, res, next) { // jshint ignore:line
     var statusCode = err.status || 500;
     if(statusCode === 500) {
