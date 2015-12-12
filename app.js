@@ -23,7 +23,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(xmlparser({
   normalizeTags:false,
   normalize:false,
-  trim:false,
+  trim:true,
   explicitArray:false,
 }));
 app.use(cookieParser());
