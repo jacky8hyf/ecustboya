@@ -324,6 +324,7 @@ router.route('/')
     // no need to pass to next()
   }, function(error) {
     // should not reach here
+    console.log('Should not reach here!', error || error.stack);
     next(error);
   });
 })
