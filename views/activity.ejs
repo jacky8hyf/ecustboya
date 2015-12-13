@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title><%= activityName %></title>
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <form method="post" class="form-signin">
+    <h2 class="form-signin-heading"><%= activityName %></h2>
+    <label for="inputName" class="sr-only">姓名</label>
+    <input name="name" id="inputName" class="form-control form-input-first" type="text" placeholder="姓名" required autofocus>
+    <label for="inputClass" class="sr-only">班级</label>
+    <input name="class" id="inputClass" class="form-control form-input-middle" type="text" placeholder="班级" required>
+    <label for="inputSID" class="sr-only">学号</label>
+    <input name="sid" id="inputSID" class="form-control form-input-middle" type="text" placeholder="学号" required>
+    <label for="inputPhone" class="sr-only">手机</label>
+    <input name="phone" id="inputPhone" class="form-control form-input-last" type="text" placeholder="手机" >
+    <input class="btn btn-lg btn-primary btn-block" type="submit" value="提交">
+  </form>
+  <div class="alert alert-danger errorMsg <%= errorMsg ? "" : "hidden" %>" role="alert">
+    <%= errorMsg %>
+  </div>
+</body>
+</html>

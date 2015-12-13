@@ -6,9 +6,14 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var xmlparser = require('express-xml-bodyparser');
 var wechatapi = require('./routes/wechatapi');
+var activity_route = require('./routes/activity');
 var cloud = require('./cloud');
 
 var app = express();
+
+var errorXmlBuilder = new (require('xml2js').Builder)({
+  rootName: 'error'
+});
 
 // 设置 view 引擎
 app.set('views', path.join(__dirname, 'views'));
@@ -55,6 +60,8 @@ app.use(function(req, res, next) {
 });
 
 // 可以将一类的路由单独保存在一个文件中
+
+app.use('/activity', activity_route);
 app.use('/wechat-api', wechatapi);
 
 // 如果任何路由都没匹配到，则认为 404
@@ -75,21 +82,18 @@ if (app.get('env') === 'development') {
       console.error(err.stack || err);
     }
     res.status(statusCode);
-    res.type('xml');
-    res.render('error', {
+    res.type('xml').send(errorXmlBuilder.buildObject({
       message: err.message || err,
       error: err
-    });
+    }));
   });
 }
 
 // 如果是非开发环境，则页面只输出简单的错误信息
 app.use(function(err, req, res, next) { // jshint ignore:line
   res.status(err.status || 500);
-  res.type('xml');
-  res.render('error', {
+  res.json({
     message: err.message || err,
-    error: {}
   });
 });
 
