@@ -47,7 +47,6 @@ router.route('/:activityId')
   var rejectToTemplatePromise =
     Promise.resolve().then(function() {
       var template = (function() {
-        console.log(body);
         if(!utils.isString(body.name) || !body.name)
           return "_nameError";
         if(!utils.isString(body.cls) || !body.cls)
