@@ -57,13 +57,13 @@ var Activity = AV.Object.extend('Activity', {
   _allowJoin: function(id, funcName) {
     var today = new Date();
     var activity = this;
-    if(today < activity.startDate())
+    if(today < activity.startDate()) // false if no start date specified
       return Promise.reject({template: "_activityNotOpen"});
-    if(today > activity.endDate())
+    if(today > activity.endDate()) // false if no end date specified
       return Promise.reject({template: "_activityClosed"});
     return Promise.all([
       Participant.countForActivity(activity), 
-      Participant[funcName](id, activity)
+      (funcName && id) ? (Participant[funcName](id, activity)) : Promise.resolve()
     ]).then(function(results) {
       var count = results[0], foundParticipant = results[1];
       if(foundParticipant) 
@@ -72,7 +72,8 @@ var Activity = AV.Object.extend('Activity', {
           formatArgs:[
             foundParticipant.name(), 
             dateformat(foundParticipant.createdAt, constants.DATE_FORMAT), 
-            activity.name()
+            activity.name(),
+            foundParticipant.rank(),
           ]
         });
       if(count >= activity.capacity())
@@ -80,12 +81,15 @@ var Activity = AV.Object.extend('Activity', {
       return Promise.resolve(count);
     });
   },
-  allowJoin: function(wechatOpenId) {
+  allowWechatOpenIdJoin: function(wechatOpenId) {
     return this._allowJoin(wechatOpenId, 'find');
   },
   allowStudentIdJoin: function(studentId) {
     return this._allowJoin(studentId, 'findByStudentId');
   },
+  allowJoin: function() {
+    return this._allowJoin(null, null);
+  }
 }, {
   find: function(keyword) {
     return new AV.Query(this)
@@ -103,7 +107,7 @@ var Activity = AV.Object.extend('Activity', {
     return this.find(keyword).then(function(activity) {
       if(!activity)
         return Promise.resolve(null);
-      return activity.allowJoin(oldMessage.FromUserName).then(function(){
+      return activity.allowWechatOpenIdJoin(oldMessage.FromUserName).then(function(){
         return Template.createResponse("_activityEnterInfoPrompt", oldMessage, [activity.name()]) 
       }, function(args) {
         return Template.createResponse(args.template, oldMessage);

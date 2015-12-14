@@ -37,7 +37,7 @@ var respondSignUp = function(message) {
       mo = message.Content.match(/^\s*(.*?)\s+(.*?)\s+(\d*?)\s+([\+\d]{11,14})\s*$/);
       if(!mo) 
         return Promise.reject({template: "_inputError", formatArgs: activity.name()});
-      return activity.allowJoin(message.FromUserName);
+      return activity.allowWechatOpenIdJoin(message.FromUserName);
     }).then(function(results) {
       count = results[1];
       if(count >= activity.capacity)
@@ -54,7 +54,8 @@ var respondSignUp = function(message) {
       return Promise.reject({template: "_activityJoined", formatArgs:[
         participant.name(), 
         dateformat(participant.createdAt, constants.DATE_FORMAT), 
-        activity.name()
+        activity.name(),
+        participant.rank(),
       ]});
     }).then(function(){}, function(args) {
       var key = args.template, formatArgs = args.formatArgs;
