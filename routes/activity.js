@@ -56,17 +56,19 @@ router.route('/:activityId')
         if(!utils.isString(body.sid) || !body.sid.match(/^\d+$/))
           return "_sidFormatError";
       })();
-      if (template) return Promise.reject({template: template})
+      if (template) 
+        return Promise.reject({template: template})
       return activity.allowStudentIdJoin(body.sid)
-    }).then(function(count){return count}, function(args) {
-      if(args instanceof Error)
-        return Promise.reject(args);
-      args.view = "msg_view";
-      args.status = 400;
-      if(args.template !== "_activityDuplicatedJoin") {
-        args.isErrorMsg = true;
-      }
-      return Promise.reject(args)
+        .then(function(count){return count}, function(args) {
+          if(args instanceof Error)
+            return Promise.reject(args);
+          args.view = "msg_view";
+          args.status = 400;
+          if(args.template !== "_activityDuplicatedJoin") {
+            args.isErrorMsg = true;
+          }
+          return Promise.reject(args)
+        })
     }).then(function(count) {
       if(count >= activity.capacity)
         return Promise.reject({template: "_activityFull"});
@@ -88,9 +90,7 @@ router.route('/:activityId')
         return Promise.reject({template: "_serverError", status: 500});
       })
     });
-
   rejectToTemplatePromise.then(function(result){throw new Error('Should not reach here!')}, function(args) {
-    console.log(args);
     if(args instanceof Error) {
       next(args);
       return;
