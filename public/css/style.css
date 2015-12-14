@@ -50,7 +50,7 @@ body {
   margin-bottom: 10px;
 }
 
-.errorMsg {
+.my-message {
   display: block;
   max-width: 330px;
   margin: 0px auto;

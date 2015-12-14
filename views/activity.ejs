@@ -10,17 +10,17 @@
   <form method="post" class="form-signin">
     <h2 class="form-signin-heading"><%= activityName %></h2>
     <label for="inputName" class="sr-only">姓名</label>
-    <input name="name" id="inputName" class="form-control form-input-first" type="text" placeholder="姓名" required autofocus>
+    <input name="name" id="inputName" class="form-control form-input-first" type="text" placeholder="姓名" value="<%= (locals.nameValue) ? nameValue : "" %>" required autofocus>
     <label for="inputClass" class="sr-only">班级</label>
-    <input name="class" id="inputClass" class="form-control form-input-middle" type="text" placeholder="班级" required>
+    <input name="cls" id="inputClass" class="form-control form-input-middle" type="text" placeholder="班级" value="<%= (locals.classValue) ? classValue : "" %>" required>
     <label for="inputSID" class="sr-only">学号</label>
-    <input name="sid" id="inputSID" class="form-control form-input-middle" type="text" placeholder="学号" required>
+    <input name="sid" id="inputSID" class="form-control form-input-middle" type="text" placeholder="学号" value="<%= (locals.studentIdValue) ? studentIdValue : "" %>" required>
     <label for="inputPhone" class="sr-only">手机</label>
-    <input name="phone" id="inputPhone" class="form-control form-input-last" type="text" placeholder="手机" >
+    <input name="phone" id="inputPhone" class="form-control form-input-last" type="text" placeholder="手机" value="<%= (locals.phoneValue) ? phoneValue : "" %>" required>
     <input class="btn btn-lg btn-primary btn-block" type="submit" value="提交">
   </form>
-  <div class="alert alert-danger errorMsg <%= errorMsg ? "" : "hidden" %>" role="alert">
-    <%= errorMsg %>
+  <div class="alert alert-danger my-message <%= (locals.message) ? "" : "hidden" %>" role="alert">
+    <%= locals.message %>
   </div>
 </body>
 </html>

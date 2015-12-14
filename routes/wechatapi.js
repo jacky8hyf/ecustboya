@@ -2,6 +2,7 @@ var router = require('express').Router();
 var AV = require('leanengine');
 var sha1 = require('js-sha1');
 var Promise = require('promise');
+var dateformat = require('dateformat');
 var xmlBuilder = new (require('xml2js').Builder)({
   headless: true,
   rootName: 'xml',
@@ -11,8 +12,7 @@ var sprintfjs = require("sprintf-js");
 var sprintf = sprintfjs.sprintf,
     vsprintf = sprintfjs.vsprintf;
 var isArray = require('../lib/utils').isArray;
-
-var SIGN_UP_ACTIVITY_SUFFIX = require('../lib/constants').SIGN_UP_ACTIVITY_SUFFIX;
+var constants = require('../lib/constants');
 
 // 类型定义
 var models = require('../models');
@@ -36,12 +36,12 @@ var respondSignUp = function(message) {
       activity = foundActivity;
       mo = message.Content.match(/^\s*(.*?)\s+(.*?)\s+(\d*?)\s+([\+\d]{11,14})\s*$/);
       if(!mo) 
-        return Promise.reject(["_inputError",activity.name()]);
+        return Promise.reject({template: "_inputError", formatArgs: activity.name()});
       return activity.allowJoin(message.FromUserName);
     }).then(function(results) {
       count = results[1];
       if(count >= activity.capacity)
-        return Promise.reject("_activityFull");
+        return Promise.reject({template: "_activityFull"});
       return Participant.new({
         activity: activity,
         name: mo[1],
@@ -51,15 +51,13 @@ var respondSignUp = function(message) {
         wechatOpenId: message.FromUserName,
       }).save();
     }).then(function(participant) {
-      return Promise.reject("_activityJoined")
+      return Promise.reject({template: "_activityJoined", formatArgs:[
+        participant.name(), 
+        dateformat(participant.createdAt, constants.DATE_FORMAT), 
+        activity.name()
+      ]});
     }).then(function(){}, function(args) {
-      var key, formatArgs;
-      if(isArray(args)) {
-        key = args[0];
-        formatArgs = args.slice(1);
-      } else {
-        key = args;
-      }
+      var key = args.template, formatArgs = args.formatArgs;
       return key ? Template.createResponse(key, message, formatArgs) : Promise.resolve(null);
     });
 }
@@ -72,8 +70,8 @@ var handleMediaMessage = function(message) {
 }
 
 var handleTextMessage = function(message) {
-  if(message.Content.endsWith(SIGN_UP_ACTIVITY_SUFFIX))
-    return Activity.createResponse(message.Content.slice(0, -SIGN_UP_ACTIVITY_SUFFIX.length), message);
+  if(message.Content.endsWith(constants.SIGN_UP_ACTIVITY_SUFFIX))
+    return Activity.createResponse(message.Content.slice(0, -constants.SIGN_UP_ACTIVITY_SUFFIX.length), message);
   return Template.createResponse(message.Content, message)
     .then(function(response) {
       return response || respondSignUp(message);

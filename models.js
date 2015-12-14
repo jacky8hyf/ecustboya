@@ -2,6 +2,8 @@ var router = require('express').Router();
 var AV = require('leanengine');
 var sha1 = require('js-sha1');
 var Promise = require('promise');
+var dateformat = require('dateformat');
+var constants = require('./lib/constants');
 var xmlBuilder = new (require('xml2js').Builder)({
   headless: true,
   rootName: 'xml',
@@ -9,7 +11,7 @@ var xmlBuilder = new (require('xml2js').Builder)({
 });
 var sprintf = require("sprintf-js").sprintf,
     vsprintf = require("sprintf-js").vsprintf;
-var isArray = require('./lib/utils').isArray;
+var utils = require('./lib/utils');
 
 var SIGN_UP_ACTIVITY_SUFFIX = require('./lib/constants').SIGN_UP_ACTIVITY_SUFFIX;
 
@@ -52,24 +54,37 @@ var Activity = AV.Object.extend('Activity', {
   capacity: function(){return this.get('capacity');},
   startDate: function(){return this.get('startDate');}, 
   endDate: function(){return this.get('endDate');}, 
-  allowJoin: function(wechatOpenId) {
+  _allowJoin: function(id, funcName) {
     var today = new Date();
     var activity = this;
     if(today < activity.startDate())
-      return Promise.reject("_activityNotOpen");
+      return Promise.reject({template: "_activityNotOpen"});
     if(today > activity.endDate())
-      return Promise.reject("_activityClosed");
+      return Promise.reject({template: "_activityClosed"});
     return Promise.all([
       Participant.countForActivity(activity), 
-      Participant.find(wechatOpenId, activity)
+      Participant[funcName](id, activity)
     ]).then(function(results) {
       var count = results[0], foundParticipant = results[1];
-      if(foundParticipant)
-        return Promise.reject("_activityDuplicatedJoin");
+      if(foundParticipant) 
+        return Promise.reject({
+          template: "_activityDuplicatedJoin", 
+          formatArgs:[
+            foundParticipant.name(), 
+            dateformat(foundParticipant.createdAt, constants.DATE_FORMAT), 
+            activity.name()
+          ]
+        });
       if(count >= activity.capacity())
-        return Promise.reject("_activityFull");
+        return Promise.reject({template: "_activityFull"});
       return Promise.resolve(count);
     });
+  },
+  allowJoin: function(wechatOpenId) {
+    return this._allowJoin(wechatOpenId, 'find');
+  },
+  allowStudentIdJoin: function(studentId) {
+    return this._allowJoin(studentId, 'findByStudentId');
   },
 }, {
   find: function(keyword) {
@@ -90,17 +105,26 @@ var Activity = AV.Object.extend('Activity', {
         return Promise.resolve(null);
       return activity.allowJoin(oldMessage.FromUserName).then(function(){
         return Template.createResponse("_activityEnterInfoPrompt", oldMessage, [activity.name()]) 
-      }, function(key) {
-        return Template.createResponse(key, oldMessage);
+      }, function(args) {
+        return Template.createResponse(args.template, oldMessage);
       });
     })
   },
 });
 var Participant = AV.Object.extend('Participant', {
+  rank: function() {return this.get('rank');},
+  name: function() {return this.get('name');},
 }, {
   find: function(wechatOpenId, activity) {
     return new AV.Query(this)
       .equalTo('wechatOpenId', wechatOpenId)
+      .equalTo('activity', activity)
+      .find().toPromise()
+      .then(function(participants) {return participants[0];});
+  },
+  findByStudentId: function(studentId, activity) {
+    return new AV.Query(this)
+      .equalTo('studentId', studentId)
       .equalTo('activity', activity)
       .find().toPromise()
       .then(function(participants) {return participants[0];});
@@ -111,7 +135,11 @@ var Participant = AV.Object.extend('Participant', {
 });
 var Template = AV.Object.extend('Template', {
   msgType: function(){return this.get('msgType');},
+  argCount:function(){return this.get('argCount');},
   content: function(args) {
+    if(!utils.isArray(args))
+      args = Array.prototype.slice.call(arguments);
+    if(args.length < this.argCount()) console.warn(new Error('Not enough arguments!'));
     return vsprintf(this.get('content'), args);
   },
   // http://mp.weixin.qq.com/wiki/4/b3546879f07623cb30df9ca0e420a5d0.html
@@ -146,12 +174,10 @@ var Template = AV.Object.extend('Template', {
   },
 }, {
   /**
-   * 查找对应关键字的模板并创建对应的消息对象。如果有多个，以更新时间排序。若没有找到模板或创建失败，返回null。
+   * 查找对应关键字的模板。如果有多个，以更新时间排序。若没有找到模板或创建失败，返回null。
    * @param keyword 模板查找关键字
-   * @param oldMessage 来自用户的消息。新创建的消息对象的接收者与发送者与oldMessage相反。
-   * @param args 若
    */
-  createResponse: function(keyword, oldMessage, args) {
+  findByKeyword: function(keyword) {
     return new AV.Query(this)
       .equalTo('keywords', keyword) // as per https://leancloud.cn/docs/js_guide.html#对数组值做查询
       .descending('updatedAt')
@@ -160,7 +186,20 @@ var Template = AV.Object.extend('Template', {
       .then(function(templates) {
         if (templates.length == 0) return Promise.resolve(null); // 如果没有模板，返回null。
         if (templates.length >= 2) console.warn('对于关键字' + keyword + '有多个消息模板；请检查。');
-        return templates[0].toMessage(oldMessage.ToUserName, oldMessage.FromUserName, args);
+        return templates[0];
+    });
+  },
+  /**
+   * 查找对应关键字的模板并创建对应的消息对象。如果有多个，以更新时间排序。若没有找到模板或创建失败，返回null。
+   * @param keyword 模板查找关键字
+   * @param oldMessage 来自用户的消息。新创建的消息对象的接收者与发送者与oldMessage相反。
+   * @param args 消息的格式参数
+   */
+  createResponse: function(keyword, oldMessage, args) {
+    return this.findByKeyword(keyword).then(function(template) {
+      if(template)
+        return template.toMessage(oldMessage.ToUserName, oldMessage.FromUserName, args);
+      return Promise.resolve(null);
     });
   },
 })

@@ -84,7 +84,7 @@ if (app.get('env') === 'development') {
     res.status(statusCode);
     res.type('xml').send(errorXmlBuilder.buildObject({
       message: err.message || err,
-      error: err
+      error: err.toJSON()
     }));
   });
 }
