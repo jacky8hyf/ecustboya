@@ -8,8 +8,8 @@
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <form method="post" class="form-signin">
-    <h2 class="form-signin-heading"><%= activityName %></h2>
+  <form method="post" class="form-signup">
+    <h2 class="activity-name-heading"><%= activityName %></h2>
     <label for="inputName" class="sr-only">姓名</label>
     <input name="name" id="inputName" class="form-control form-input-first" type="text" placeholder="姓名" value="<%= (locals.nameValue) ? nameValue : "" %>" required autofocus>
     <label for="inputClass" class="sr-only">班级</label>

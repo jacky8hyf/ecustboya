@@ -103,6 +103,18 @@ router.route('/:activityId')
       res.status(args.status || 400).render(args.view || "activity", req.viewArgs);
     })
   });
+});
+
+router.route('/:activityId/summary')
+.all(function(req, res, next) {
+  next();
+})
+.get(function(req, res, next) {
+  Participant.findByActivity(req.activity).then(function(participants) {
+    res.render('activity_summary', {activityName:req.activity.name(), participants: participants})
+  }, function(error) {
+    next(error);
+  })
 })
 
 module.exports = router;

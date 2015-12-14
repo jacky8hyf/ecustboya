@@ -82,7 +82,7 @@ var Activity = AV.Object.extend('Activity', {
     });
   },
   allowWechatOpenIdJoin: function(wechatOpenId) {
-    return this._allowJoin(wechatOpenId, 'find');
+    return this._allowJoin(wechatOpenId, 'findByWechatOpenId');
   },
   allowStudentIdJoin: function(studentId) {
     return this._allowJoin(studentId, 'findByStudentId');
@@ -118,20 +118,26 @@ var Activity = AV.Object.extend('Activity', {
 var Participant = AV.Object.extend('Participant', {
   rank: function() {return this.get('rank');},
   name: function() {return this.get('name');},
+  cls: function() {return this.get('cls');},
 }, {
-  find: function(wechatOpenId, activity) {
+  _findById: function(name, id, activity) {
     return new AV.Query(this)
-      .equalTo('wechatOpenId', wechatOpenId)
+      .equalTo(name, id)
       .equalTo('activity', activity)
       .find().toPromise()
       .then(function(participants) {return participants[0];});
   },
+  findByWechatOpenId: function(wechatOpenId, activity) {
+    return this._findById('wechatOpenId', wechatOpenId, activity);
+  },
   findByStudentId: function(studentId, activity) {
+    return this._findById('studentId', studentId, activity);
+  },
+  findByActivity: function(activity) {
     return new AV.Query(this)
-      .equalTo('studentId', studentId)
       .equalTo('activity', activity)
-      .find().toPromise()
-      .then(function(participants) {return participants[0];});
+      .ascending('createdAt')
+      .find().toPromise();
   },
   countForActivity: function(activity) {
     return new AV.Query(this).equalTo('activity', activity).count().toPromise();
