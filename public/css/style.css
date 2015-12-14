@@ -1,11 +1,17 @@
-/*@import url(//fonts.googleapis.com/earlyaccess/notosansrunic.css);
-* {
- font-family: 'Noto Sans Runic', sans-serif;
-}*/
+/*@import url(//fonts.googleapis.com/earlyaccess/notosansrunic.css);*/
+/*@font-face {*/
+/* font-family: 'Noto Sans Runic', sans-serif;*/
+/*}*/
 body {
   padding-top: 40px;
   padding-bottom: 40px;
   background-color: #eee;
+}
+
+.my-message {
+  display: block;
+  max-width: 330px;
+  margin: 0px auto;
 }
 
 .form-signin {
@@ -50,11 +56,6 @@ body {
   margin-bottom: 10px;
 }
 
-.my-message {
-  display: block;
-  max-width: 330px;
-  margin: 0px auto;
-}
 
 
 
